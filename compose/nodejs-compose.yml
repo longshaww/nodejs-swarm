@@ -1,0 +1,38 @@
+version: "3.3"
+services:
+     django:
+          image: 922017895067.dkr.ecr.ap-southeast-1.amazonaws.com/sapa-dev-django:latest
+          command: ["node", "./bin/www"]
+          environment:
+               TRAEFIK_PUBLIC_TAG: traefik-public
+               DOMAIN: high3ar.club
+               DOCKER_REGISTRY: 922017895067.dkr.ecr.ap-southeast-1.amazonaws.com/
+               STACK_NAME: high3ar-dev
+               ENV: dev
+               SERVICES_NAME: django,celery_beat,celery_worker,traefik,flower,redis
+               SUPER_EMAIL: trinh.mai@zien.vn
+               SUPER_PASS: MoZiSa?12357
+               SUPER_USERNAME: trinh-mai
+               USE_DOCKER: "yes"
+          networks:
+               - default
+               - traefik-public
+          logging:
+               driver: json-file
+               deploy:
+                    labels:
+                         - traefik.enable=true
+                         - traefik.constraint-label=traefik-public
+                         - traefik.http.routers.high3ar-dev-backend-http.rule=Host(`high3ar.club`)
+                         - traefik.http.routers.high3ar-dev-backend-http.entrypoints=http
+                         - traefik.http.routers.high3ar-dev-backend-http.middlewares=https-redirect
+                         - traefik.http.routers.high3ar-dev-backend-https.rule=Host(`high3ar.club`)
+                         - traefik.http.routers.high3ar-dev-backend-https.entrypoints=https
+                         - traefik.http.routers.high3ar-dev-backend-https.tls=true
+                         - traefik.http.routers.high3ar-dev-backend-https.tls.certresolver=le
+                         - traefik.http.services.high3ar-dev-backend.loadbalancer.server.port=4000
+networks:
+     default:
+          driver: overlay
+     traefik-public:
+          external: true

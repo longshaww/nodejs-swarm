@@ -1,0 +1,42 @@
+output.elasticsearch:
+     username: "elastic"
+     password: ${ELASTIC_PASSWORD}
+     hosts: ["${ELASTIC_HOST}"]
+
+setup.kibana:
+     host: "${KIBANA_HOST}"
+
+heartbeat.config.monitors:
+     path: ${path.config}/monitors.d/*.yml
+     reload.enabled: true
+     reload.period: 15s
+
+heartbeat.autodiscover:
+     providers:
+          - type: docker
+            hints.enabled: true
+
+heartbeat.monitors:
+     - type: tcp
+       hosts: ["redis:6379"]
+       schedule: "@every 30s"
+       id: ${ENV}-resource-redis
+       name: "${ENV} - Redis"
+
+     - type: tcp
+       hosts: ["tasks.resource_redis-sentinel:26379"]
+       mode: all
+       schedule: "@every 30s"
+       id: ${ENV}-resource-redis-sentinel
+       name: "${ENV} - Redis Sentinel"
+
+     - type: http
+       hosts: ["traefik"]
+       schedule: "@every 30s"
+       id: ${ENV}-system-traefik
+       name: "${ENV} - Traefik gateway"
+       check.response.status: [404]
+
+processors:
+     - add_cloud_metadata: ~
+     - add_docker_metadata: ~

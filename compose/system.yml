@@ -1,0 +1,113 @@
+version: "3.3"
+services:
+     filebeat:
+          image: docker.elastic.co/beats/filebeat:8.1.3
+          user: root
+          environment:
+               ELASTIC_HOST: localhost:443
+               ELASTIC_PASSWORD: changethis
+               setup.kibana.host: localhost:443
+          volumes:
+               - /var/lib/docker/containers:/var/lib/docker/containers:ro
+               - /var/run/docker.sock:/var/run/docker.sock:ro
+          networks:
+               - default
+          configs:
+               - source: system_filebeat.yml
+                 target: /usr/share/filebeat/filebeat.yml
+          logging:
+               driver: json-file
+          deploy:
+               replicas: 0
+     heartbeat:
+          image: docker.elastic.co/beats/heartbeat:8.1.3
+          user: root
+          healthcheck:
+               test:
+                    - CMD-SHELL
+                    - heartbeat test config
+               interval: 30s
+               timeout: 15s
+               retries: 5
+          environment:
+               ELASTIC_HOST: localhost:443
+               ELASTIC_PASSWORD: changethis
+               ENV: DEV
+               KIBANA_HOST: localhost:443
+          volumes:
+               - /var/run/docker.sock:/var/run/docker.sock:ro
+          networks:
+               - heart-beat
+          configs:
+               - source: system_heartbeat.yml
+                 target: /usr/share/heartbeat/heartbeat.yml
+          logging:
+               driver: json-file
+          deploy:
+               replicas: 0
+     traefik:
+          image: traefik:v2.2
+          command:
+               - --providers.docker
+               - --providers.docker.network=traefik-public
+               - --providers.docker.constraints=Label(`traefik.constraint-label`, `traefik-public`)
+               - --providers.docker.exposedbydefault=false
+               - --providers.docker.swarmmode
+               - --entrypoints.http.address=:80
+               - --entrypoints.https.address=:443
+               - --certificatesresolvers.le.acme.email=long.tran@zien.vn
+               - --certificatesresolvers.le.acme.storage=/certificates/acme.json
+               - --certificatesresolvers.le.acme.tlschallenge=true
+               - --accesslog
+               - --log
+               - --api
+          ports:
+               - 80:80
+               - 443:443
+          volumes:
+               - /var/run/docker.sock:/var/run/docker.sock:ro
+               - traefik-public-certificates:/certificates
+          networks:
+               - traefik-public
+               - heart-beat
+          logging:
+               driver: json-file
+               options:
+                    max-file: "5"
+                    max-size: 12m
+          deploy:
+               labels:
+                    traefik.http.middlewares.https-redirect.redirectscheme.scheme: https
+                    traefik.http.middlewares.admin-auth.basicauth.users: admin:$apr1$MGBj/jRg$i3tAsf9h2LcAHeWSwpHHl0
+                    traefik.http.routers.traefik-public-https.rule: Host(`traefik.high3ar.club`)
+                    traefik.http.routers.traefik-public-https.tls: "true"
+                    traefik.http.services.traefik-public.loadbalancer.server.port: "80"
+                    traefik.http.routers.traefik-public-https.service: api@internal
+                    traefik.http.routers.traefik-public-http.middlewares: https-redirect
+                    traefik.http.routers.traefik-public-http.entrypoints: http
+                    traefik.http.routers.traefik-public-https.entrypoints: https
+                    traefik.http.middlewares.https-redirect.redirectscheme.permanent: "true"
+                    traefik.constraint-label: traefik-public
+                    traefik.http.routers.traefik-public-http.rule: Host(`traefik.high3ar.club`)
+                    traefik.http.routers.traefik-public-https.middlewares: admin-auth
+                    traefik.docker.network: traefik-public
+                    traefik.enable: "true"
+                    traefik.http.routers.traefik-public-https.tls.certresolver: le
+               placement:
+                    constraints:
+                         - node.labels.traefik-public.traefik-public-certificates==true
+networks:
+     default:
+          driver: overlay
+     heart-beat:
+          external: true
+     traefik-public:
+          external: true
+configs:
+     system_filebeat.yml:
+          external: true
+     system_heartbeat.yml:
+          external: true
+volumes:
+     traefik-public-certificates:
+          external: true

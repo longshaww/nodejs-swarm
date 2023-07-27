@@ -1,0 +1,54 @@
+# https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+filebeat.config:
+     modules:
+          path: ${path.config}/modules.d/*.yml
+          reload.enabled: true
+
+# https://www.elastic.co/guide/en/beats/filebeat/8.5/configuration-autodiscover.html#_docker_2
+filebeat.autodiscover:
+     providers:
+          - type: docker
+            hints.enabled: true
+
+processors:
+     - add_id: ~ # https://www.elastic.co/guide/en/beats/filebeat/8.5/filebeat-deduplication.html
+     - add_docker_metadata:
+            # https://www.elastic.co/guide/en/beats/filebeat/8.5/add-docker-metadata.html
+            host: "unix:///var/run/docker.sock"
+
+     # https://www.elastic.co/guide/en/beats/filebeat/8.5/decode-json-fields.html
+     - decode_json_fields:
+            fields: ["message"]
+            target: ""
+            overwrite_keys: true
+            add_error_key: true
+            expand_keys: true
+            #document_id: '_id'
+
+# https://www.elastic.co/guide/en/beats/filebeat/8.5/filebeat-input-container.html
+#filebeat.inputs:
+#- type: container
+#  stream: stdout
+#  ignore_older: 24h
+# https://discuss.elastic.co/t/log-log-go-145-non-zero-metrics-in-the-last-30s/231873/11
+#  paths:
+#    - /var/lib/docker/containers/*/*-json.log
+#    - /var/lib/docker/containers/*/local-logs/*.log
+#  json.message_key: params
+#  json.keys_under_root: true
+#  json.add_error_key: true
+#  json.document_id: '_id'
+#  json.ignore_decoding_error: true
+#  tags: ["json"]
+
+output.elasticsearch:
+     hosts: ["${ELASTIC_HOST}"]
+     username: "elastic"
+     password: ${ELASTIC_PASSWORD}
+     template.name: filebeat
+     template.path: filebeat.template.json
+     console:
+          pretty: true
+
+logging.json: true
+logging.metrics.enabled: false
