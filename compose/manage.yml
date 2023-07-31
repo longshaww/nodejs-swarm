@@ -27,14 +27,26 @@ services:
                SWARMPIT_DB: http://db:5984
                SWARMPIT_INFLUXDB: http://influxdb:8086
           ports:
-               - 3000:8080
+               - 8080:8080
           volumes:
                - /var/run/docker.sock:/var/run/docker.sock:ro
           networks:
                - net
+               - traefik-public
           logging:
                driver: json-file
           deploy:
+               labels:
+                    traefik.http.routers.manage-swarmpit-https.rule: Host(`dashboard.high3ar.club`)
+                    traefik.http.routers.manage-swarmpit-http.entrypoints: http
+                    traefik.http.routers.manage-swarmpit-http.rule: Host(`dashboard.high3ar.club`)
+                    traefik.http.routers.manage-swarmpit-https.tls: "true"
+                    traefik.http.routers.manage-swarmpit-http.middlewares: https-redirect
+                    traefik.constraint-label: traefik-public
+                    traefik.http.routers.manage-swarmpit-https.entrypoints: https
+                    traefik.http.routers.manage-swarmpit-https.tls.certresolver: le
+                    traefik.enable: "true"
+                    traefik.http.services.manage-swarmpit.loadbalancer.server.port: "8080"
                placement:
                     constraints:
                          - node.role == manager
